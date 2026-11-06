@@ -1,0 +1,23 @@
+{
+  "name": "pharmacare-suite",
+  "version": "1.0.0",
+  "description": "PharmaCare - Complete Pharmacy Management System (React Frontend + Express Backend + MySQL)",
+  "private": true,
+  "scripts": {
+    "start:backend": "cd backend && npm start",
+    "dev:backend": "cd backend && npm run dev",
+    "test:backend": "cd backend && npm test",
+    "dev:frontend": "cd frontend && npm run dev",
+    "build:frontend": "cd frontend && npm run build"
+  },
+  "keywords": [
+    "pharmacy-management-system",
+    "fefo",
+    "drap-compliance",
+    "mysql",
+    "express",
+    "react"
+  ],
+  "author": "PharmaCare Engineering Team",
+  "license": "UNLICENSED"
+}

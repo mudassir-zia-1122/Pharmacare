@@ -1,0 +1,53 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Environment variables & secrets
+.env
+.env.*
+!.env.example
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+logs/
+*.log
+
+# Build outputs
+dist/
+dist-ssr/
+build/
+*.local
+
+# Editor & OS files
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db
+
+# Private user uploads & database dumps
+uploads/
+**/uploads/
+database/backups/
+*.sql.gz
+*.dump
+*.bak
+
+# Private keys, certificates & secrets
+certs/
+**/certs/
+*.pem
+*.crt
+*.cer
+*.pfx
+*.p12
+*.key
+*.pem.key
+**/*.key
