@@ -5,6 +5,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import app from './app.js';
 import { checkDbHealth } from './config/db.js';
+import { validateSecurityConfigOnStartup } from './config/security.js';
 import { logger } from './utils/logger.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -22,10 +23,18 @@ for (const envFile of envCandidates) {
   }
 }
 
+// Fail fast if critical security configuration (e.g. JWT_SECRET) is missing or insecure
+try {
+  validateSecurityConfigOnStartup();
+} catch (configError) {
+  logger.error(`[SECURITY STARTUP ABORT] ${configError.message}`);
+  process.exit(1);
+}
+
 const PORT = parseInt(process.env.PORT || '5000', 10);
 const server = http.createServer(app);
 
-server.listen(PORT, async () => {
+server.listen(PORT, '0.0.0.0', async () => {
   logger.info(`=======================================================`);
   logger.info(` PharmaCare API Server running on port ${PORT}`);
   logger.info(` Environment: ${process.env.NODE_ENV || 'development'}`);

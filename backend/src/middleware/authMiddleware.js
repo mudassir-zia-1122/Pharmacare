@@ -1,6 +1,7 @@
 import jwt from 'jsonwebtoken';
 import { ApiError } from '../utils/ApiError.js';
 import { query } from '../config/db.js';
+import { getJwtSecret } from '../config/security.js';
 
 /**
  * Authentication middleware.
@@ -22,7 +23,7 @@ export async function authenticate(req, res, next) {
       throw ApiError.unauthorized('Authorization header or token query parameter required');
     }
 
-    const secret = process.env.JWT_SECRET || 'fallback_secret_never_use_in_prod';
+    const secret = getJwtSecret();
     let decoded;
     try {
       decoded = jwt.verify(token, secret);

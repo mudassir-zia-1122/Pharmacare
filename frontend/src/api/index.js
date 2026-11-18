@@ -1,4 +1,10 @@
-export { default as apiClient } from './client.js';
+export {
+  default as apiClient,
+  API_BASE_URL,
+  BACKEND_ORIGIN,
+  getBackendOrigin,
+  resolveMediaUrl,
+} from './client.js';
 export * as authApi from './auth.js';
 export * as systemApi from './system.js';
 export * as dashboardApi from './dashboard.js';

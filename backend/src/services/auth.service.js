@@ -1,6 +1,7 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { query } from '../config/db.js';
+import { getJwtSecret } from '../config/security.js';
 import { ApiError } from '../utils/ApiError.js';
 import { logAudit } from './audit.service.js';
 
@@ -37,7 +38,7 @@ export async function loginUser(identifier, password, ipAddress, userAgent) {
   }
 
   // Generate short-lived JWT token
-  const secret = process.env.JWT_SECRET || 'fallback_secret_never_use_in_prod';
+  const secret = getJwtSecret();
   const expiresIn = process.env.JWT_EXPIRES_IN || '8h';
 
   const token = jwt.sign(
@@ -124,25 +125,97 @@ export async function changeUserPassword(userId, oldPassword, newPassword, ipAdd
   return { message: 'Password changed successfully' };
 }
 
-export async function loginWithFirebase(idToken, email, ipAddress, userAgent) {
-  if (!email) {
-    throw ApiError.badRequest('Email is required for Firebase authentication');
+/**
+ * Lazily verifies a Firebase ID token using Firebase Admin SDK.
+ * Fails closed unless FIREBASE_AUTH_ENABLED=true AND firebase-admin is installed
+ * and initialized with server-side service account credentials.
+ */
+async function verifyFirebaseIdTokenServerSide(idToken) {
+  if (process.env.FIREBASE_AUTH_ENABLED !== 'true') {
+    throw new ApiError(
+      503,
+      'Firebase authentication is disabled on this server. Please sign in with your staff account.'
+    );
   }
 
-  // Look up user by email in database
+  let admin;
+  try {
+    const mod = await import('firebase-admin');
+    admin = mod.default || mod;
+  } catch {
+    throw new ApiError(
+      503,
+      'Firebase Admin SDK is not installed on the server. Firebase authentication is disabled.'
+    );
+  }
+
+  if (!admin.apps || admin.apps.length === 0) {
+    const rawServiceAccount = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
+    if (rawServiceAccount) {
+      let serviceAccount;
+      try {
+        serviceAccount = JSON.parse(rawServiceAccount);
+      } catch {
+        throw new ApiError(503, 'Invalid Firebase Admin service account configuration.');
+      }
+      admin.initializeApp({
+        credential: admin.credential.cert(serviceAccount),
+      });
+    } else if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+      admin.initializeApp({
+        credential: admin.credential.applicationDefault(),
+      });
+    } else {
+      throw new ApiError(
+        503,
+        'Firebase Admin credentials are not configured on the server. Firebase authentication is disabled.'
+      );
+    }
+  }
+
+  try {
+    return await admin.auth().verifyIdToken(idToken, true);
+  } catch {
+    throw ApiError.unauthorized('Invalid or expired Firebase authentication token.');
+  }
+}
+
+export async function loginWithFirebase(idToken, _clientEmail, ipAddress, userAgent) {
+  // Strictly require a structurally valid token before anything else
+  if (
+    !idToken ||
+    typeof idToken !== 'string' ||
+    idToken.trim().split('.').length !== 3
+  ) {
+    throw ApiError.unauthorized('A valid Firebase ID token is required.');
+  }
+
+  // Cryptographically verify token server-side; NEVER trust client-supplied email or role
+  const decodedFirebaseToken = await verifyFirebaseIdTokenServerSide(idToken.trim());
+
+  const verifiedEmail = decodedFirebaseToken?.email?.toLowerCase().trim();
+  if (!verifiedEmail) {
+    throw ApiError.unauthorized('Verified Firebase token does not contain an email identity.');
+  }
+
+  if (decodedFirebaseToken.email_verified === false) {
+    throw ApiError.forbidden('Firebase email address must be verified before signing in.');
+  }
+
+  // Fetch actual user role and account status from the database
   const users = await query(
     `SELECT u.id, u.username, u.email, u.full_name, u.phone,
             u.status, u.role_id, r.name AS role_name, r.display_name AS role_display
        FROM users u
        JOIN roles r ON u.role_id = r.id
-      WHERE u.email = ? AND u.deleted_at IS NULL
+      WHERE LOWER(u.email) = ? AND u.deleted_at IS NULL
       LIMIT 1`,
-    [email.toLowerCase().trim()]
+    [verifiedEmail]
   );
 
   if (!users || users.length === 0) {
     throw ApiError.forbidden(
-      `Firebase account (${email}) is not registered in the PharmaCare staff directory. Please contact your administrator.`
+      'This verified account is not registered in the PharmaCare staff directory. Please contact your administrator.'
     );
   }
 
@@ -152,8 +225,8 @@ export async function loginWithFirebase(idToken, email, ipAddress, userAgent) {
     throw ApiError.forbidden('User account is currently disabled. Please contact administrator.');
   }
 
-  // Generate short-lived JWT token matching the backend standard
-  const secret = process.env.JWT_SECRET || 'fallback_secret_never_use_in_prod';
+  // Generate short-lived JWT token using strictly validated server secret
+  const secret = getJwtSecret();
   const expiresIn = process.env.JWT_EXPIRES_IN || '8h';
 
   const token = jwt.sign(
@@ -180,7 +253,7 @@ export async function loginWithFirebase(idToken, email, ipAddress, userAgent) {
     recordId: user.id,
     ipAddress,
     userAgent,
-    details: { authProvider: 'firebase', email },
+    details: { authProvider: 'firebase', uid: decodedFirebaseToken.uid },
   });
 
   return {

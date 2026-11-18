@@ -27,11 +27,23 @@ for (const envFile of envCandidates) {
 
 const app = express();
 
-// Serve static uploads for prescriptions and doctor photos safely
-const uploadsDir = fs.existsSync(path.resolve(__dirname, '../uploads'))
-  ? path.resolve(__dirname, '../uploads')
-  : path.resolve('uploads');
-app.use('/uploads', express.static(uploadsDir));
+// Trust first reverse proxy hop (required on Render / Vercel / cloud load balancers for accurate req.ip & express-rate-limit)
+app.set('trust proxy', 1);
+
+// Block any direct unauthenticated access to private prescription files
+app.use('/uploads/prescriptions', (req, res) => {
+  return res.status(403).json({
+    success: false,
+    statusCode: 403,
+    message: 'Direct public access to private prescription files is forbidden. Use authenticated API endpoints.',
+  });
+});
+
+// Serve ONLY public doctor photographs statically (never serve private prescriptions publicly)
+const doctorUploadsDir = fs.existsSync(path.resolve(__dirname, '../uploads/doctors'))
+  ? path.resolve(__dirname, '../uploads/doctors')
+  : path.resolve('uploads/doctors');
+app.use('/uploads/doctors', express.static(doctorUploadsDir));
 
 // Security HTTP headers with cross-origin resource policy support for authenticated prescription streams
 app.use(
@@ -40,13 +52,21 @@ app.use(
   })
 );
 
-// CORS configuration
-const allowedOrigins = (process.env.CORS_ORIGIN || 'http://localhost:5173').split(',');
+// CORS configuration (trimmed & normalized without trailing slashes)
+const allowedOrigins = (process.env.CORS_ORIGIN || 'http://localhost:5173')
+  .split(',')
+  .map((origin) => origin.trim().replace(/\/+$/, ''))
+  .filter(Boolean);
+
 app.use(
   cors({
     origin: (origin, callback) => {
-      // Allow requests with no origin (like mobile apps, curl, or Postman)
-      if (!origin || allowedOrigins.includes(origin)) {
+      // Allow requests with no origin (like mobile apps, curl, health checks, or Postman)
+      if (!origin) {
+        return callback(null, true);
+      }
+      const normalizedOrigin = origin.replace(/\/+$/, '');
+      if (allowedOrigins.includes(normalizedOrigin)) {
         return callback(null, true);
       }
       return callback(new Error('Blocked by CORS policy'));

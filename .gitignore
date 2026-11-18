@@ -51,3 +51,6 @@ certs/
 *.key
 *.pem.key
 **/*.key
+
+# Local verification scripts with machine-specific paths / test credentials
+backend/scripts/run-e2e-repair-verification.js

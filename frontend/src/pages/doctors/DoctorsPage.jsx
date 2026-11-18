@@ -28,7 +28,7 @@ import { Table, Thead, Th, Tbody, Tr, Td } from '../../components/common/Table';
 import { StatusBadge } from '../../components/common/Badge';
 import { Modal } from '../../components/common/Modal';
 import { EmptyState } from '../../components/common/EmptyState';
-import { doctorApi } from '../../api';
+import { doctorApi, resolveMediaUrl } from '../../api';
 import { useAuth } from '../../context/AuthContext';
 
 const DAYS_OF_WEEK = [
@@ -218,7 +218,7 @@ export function DoctorsPage() {
   // Photo Handlers
   const handleOpenPhoto = (doc) => {
     setSelectedFile(null);
-    setPhotoPreview(doc.photoUrl || '');
+    setPhotoPreview(resolveMediaUrl(doc.photoUrl || doc.profilePhotoUrl));
     setPhotoModal({ open: true, doctor: doc });
   };
 
@@ -440,9 +440,9 @@ export function DoctorsPage() {
                   <Td>
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-xl overflow-hidden bg-teal-50 dark:bg-teal-950/60 border border-teal-200 dark:border-teal-800 flex items-center justify-center shrink-0">
-                        {doc.photoUrl ? (
+                        {doc.photoUrl || doc.profilePhotoUrl ? (
                           <img
-                            src={doc.photoUrl}
+                            src={resolveMediaUrl(doc.photoUrl || doc.profilePhotoUrl)}
                             alt={doc.fullName}
                             className="w-full h-full object-cover"
                           />
@@ -1023,8 +1023,12 @@ export function DoctorsPage() {
           <div className="space-y-4 text-xs">
             <div className="flex items-center gap-3 p-3 bg-slate-50 dark:bg-slate-800/60 rounded-xl">
               <div className="w-14 h-14 rounded-xl overflow-hidden bg-teal-100 flex items-center justify-center font-bold text-lg text-teal-700">
-                {viewModal.doctor.photoUrl ? (
-                  <img src={viewModal.doctor.photoUrl} alt="" className="w-full h-full object-cover" />
+                {viewModal.doctor.photoUrl || viewModal.doctor.profilePhotoUrl ? (
+                  <img
+                    src={resolveMediaUrl(viewModal.doctor.photoUrl || viewModal.doctor.profilePhotoUrl)}
+                    alt={viewModal.doctor.fullName}
+                    className="w-full h-full object-cover"
+                  />
                 ) : (
                   viewModal.doctor.fullName.slice(0, 2).toUpperCase()
                 )}

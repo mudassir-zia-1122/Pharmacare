@@ -1,4 +1,4 @@
-import apiClient from './client.js';
+import apiClient, { API_BASE_URL } from './client.js';
 
 /**
  * Public: Doctors submit medicine availability check
@@ -47,11 +47,15 @@ export async function retryInquiryEmail(id) {
 }
 
 /**
- * Helper to build secure image URL
+ * Helper to build authenticated inquiry prescription image URL
+ * Uses VITE_API_BASE_URL (via API_BASE_URL) and pharma_token consistently.
  */
-export function getInquiryImageUrl(id) {
-  const token = localStorage.getItem('auth_token') || sessionStorage.getItem('auth_token') || localStorage.getItem('token');
-  return token ? `/api/v1/inquiries/${id}/image?token=${encodeURIComponent(token)}` : `/api/v1/inquiries/${id}/image`;
+export function getInquiryImageUrl(id, apiBaseUrl = API_BASE_URL) {
+  const normalizedBase = (apiBaseUrl || '/api/v1').replace(/\/+$/, '');
+  const token =
+    typeof localStorage !== 'undefined' ? localStorage.getItem('pharma_token') : null;
+  const baseUrl = `${normalizedBase}/inquiries/${encodeURIComponent(id)}/image`;
+  return token ? `${baseUrl}?token=${encodeURIComponent(token)}` : baseUrl;
 }
 
 export default {

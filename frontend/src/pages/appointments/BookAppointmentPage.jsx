@@ -21,7 +21,7 @@ import {
   RefreshCw,
   HeartPulse,
 } from 'lucide-react';
-import { doctorApi, appointmentApi } from '../../api';
+import { doctorApi, appointmentApi, resolveMediaUrl } from '../../api';
 
 export function BookAppointmentPage() {
   // Step indicator: 1 = Department, 2 = Doctor, 3 = Date & Slot, 4 = Patient Details, 5 = Confirmation Slip
@@ -401,9 +401,9 @@ export function BookAppointmentPage() {
                     <div className="flex items-start gap-4">
                       {/* Photo or Initials */}
                       <div className="w-16 h-16 rounded-2xl overflow-hidden bg-teal-50 dark:bg-teal-950/60 border border-teal-200 dark:border-teal-800 flex items-center justify-center shrink-0">
-                        {doc.photoUrl ? (
+                        {doc.photoUrl || doc.profilePhotoUrl ? (
                           <img
-                            src={doc.photoUrl}
+                            src={resolveMediaUrl(doc.photoUrl || doc.profilePhotoUrl)}
                             alt={doc.fullName}
                             className="w-full h-full object-cover"
                           />

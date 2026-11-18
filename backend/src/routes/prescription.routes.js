@@ -6,6 +6,14 @@ import { ROLES } from '../config/constants.js';
 
 const router = Router();
 
+// Authenticated & authorized prescription file streaming (Admin, Pharmacist, Doctor)
+router.get(
+  '/files/:filename',
+  authenticate,
+  hasRole(ROLES.ADMIN, ROLES.PHARMACIST, ROLES.DOCTOR),
+  prescriptionController.streamPrescriptionFile
+);
+
 // RESTRICTED ACCESS: Only Pharmacist and Admin can view or verify prescription records
 router.use(authenticate, hasRole(ROLES.ADMIN, ROLES.PHARMACIST));
 

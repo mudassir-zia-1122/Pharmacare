@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Navigate, Link } from 'react-router-dom';
-import { Pill, Eye, EyeOff, AlertCircle, Database, ShieldCheck, Flame, Stethoscope, ArrowRight } from 'lucide-react';
+import { Pill, Eye, EyeOff, AlertCircle, Database, Flame, Stethoscope, ArrowRight } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { systemApi } from '../../api';
+
+const isFirebaseTabEnabled = import.meta.env.VITE_ENABLE_FIREBASE_AUTH === 'true';
 
 export function LoginPage() {
   const {
@@ -15,11 +17,11 @@ export function LoginPage() {
 
   const navigate = useNavigate();
   const [authMode, setAuthMode] = useState('staff'); // 'staff' | 'firebase'
-  const [form, setForm] = useState({ identifier: 'admin', password: 'Password123!' });
+  const [form, setForm] = useState({ identifier: '', password: '' });
   const [firebaseForm, setFirebaseForm] = useState({ email: '', password: '' });
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
-  const [statusNotice, setStatusNotice] = useState(null);
+  const [statusNotice, setStatusNotice] = useState({ type: 'loading', msg: 'Checking server connection...' });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Reactive navigation: whenever isAuthenticated becomes true, go to dashboard
@@ -121,11 +123,6 @@ export function LoginPage() {
     }
   };
 
-  const setPreset = (u, p) => {
-    setForm({ identifier: u, password: p });
-    setError('');
-  };
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 to-slate-100 dark:from-slate-950 dark:to-slate-900 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
@@ -140,33 +137,35 @@ export function LoginPage() {
             <p className="text-green-100 text-xs mt-1">Pharmacy Management System</p>
           </div>
 
-          {/* Mode Tabs */}
-          <div className="grid grid-cols-2 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
-            <button
-              type="button"
-              onClick={() => { setAuthMode('staff'); setError(''); }}
-              className={`py-3 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors border-b-2 ${
-                authMode === 'staff'
-                  ? 'border-green-600 text-green-700 dark:text-green-400 bg-white dark:bg-slate-900'
-                  : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
-              }`}
-            >
-              <Database size={14} />
-              Staff Account (MySQL)
-            </button>
-            <button
-              type="button"
-              onClick={() => { setAuthMode('firebase'); setError(''); }}
-              className={`py-3 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors border-b-2 ${
-                authMode === 'firebase'
-                  ? 'border-orange-500 text-orange-600 dark:text-orange-400 bg-white dark:bg-slate-900'
-                  : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
-              }`}
-            >
-              <Flame size={14} />
-              Firebase Auth
-            </button>
-          </div>
+          {/* Mode Tabs (Firebase tab only displayed when explicitly enabled with server-side verification) */}
+          {isFirebaseTabEnabled && isFirebaseConfigured && (
+            <div className="grid grid-cols-2 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
+              <button
+                type="button"
+                onClick={() => { setAuthMode('staff'); setError(''); }}
+                className={`py-3 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors border-b-2 ${
+                  authMode === 'staff'
+                    ? 'border-green-600 text-green-700 dark:text-green-400 bg-white dark:bg-slate-900'
+                    : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+                }`}
+              >
+                <Database size={14} />
+                Staff Account
+              </button>
+              <button
+                type="button"
+                onClick={() => { setAuthMode('firebase'); setError(''); }}
+                className={`py-3 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors border-b-2 ${
+                  authMode === 'firebase'
+                    ? 'border-orange-500 text-orange-600 dark:text-orange-400 bg-white dark:bg-slate-900'
+                    : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+                }`}
+              >
+                <Flame size={14} />
+                Firebase Auth
+              </button>
+            </div>
+          )}
 
           {/* Form Container */}
           <div className="px-8 py-6">
@@ -213,7 +212,7 @@ export function LoginPage() {
                     autoComplete="username"
                     value={form.identifier}
                     onChange={e => setForm(f => ({ ...f, identifier: e.target.value }))}
-                    placeholder="e.g. admin or admin@pharmacare.pk"
+                    placeholder="Enter username or email"
                     className="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-green-600 focus:border-transparent transition-colors"
                   />
                 </div>
@@ -239,36 +238,6 @@ export function LoginPage() {
                       aria-label={showPassword ? 'Hide password' : 'Show password'}
                     >
                       {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
-                    </button>
-                  </div>
-                </div>
-
-                {/* Quick Fill presets for QA & Development */}
-                <div className="mt-1">
-                  <p className="text-[10px] text-slate-400 uppercase font-semibold tracking-wider mb-1 flex items-center gap-1">
-                    <ShieldCheck size={11} /> Quick Fill Presets:
-                  </p>
-                  <div className="flex flex-wrap gap-1">
-                    <button
-                      type="button"
-                      onClick={() => setPreset('admin', 'Password123!')}
-                      className="text-[11px] px-2 py-0.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 rounded text-slate-700 dark:text-slate-300 transition-colors"
-                    >
-                      admin
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setPreset('ahmed', 'Password123!')}
-                      className="text-[11px] px-2 py-0.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 rounded text-slate-700 dark:text-slate-300 transition-colors"
-                    >
-                      ahmed (Pharmacist)
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setPreset('sara', 'Password123!')}
-                      className="text-[11px] px-2 py-0.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 rounded text-slate-700 dark:text-slate-300 transition-colors"
-                    >
-                      sara (Cashier)
                     </button>
                   </div>
                 </div>
