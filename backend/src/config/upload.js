@@ -1,46 +1,9 @@
 import multer from 'multer';
 import path from 'path';
-import crypto from 'crypto';
-import fs from 'fs';
-import { fileURLToPath } from 'url';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+export const MAX_UPLOAD_SIZE_BYTES = 5 * 1024 * 1024; // 5 Megabytes
 
-const prescriptionUploadDir = path.resolve(__dirname, '../../uploads/prescriptions');
-const doctorUploadDir = path.resolve(__dirname, '../../uploads/doctors');
-
-// Ensure directories exist
-if (!fs.existsSync(prescriptionUploadDir)) {
-  fs.mkdirSync(prescriptionUploadDir, { recursive: true });
-}
-if (!fs.existsSync(doctorUploadDir)) {
-  fs.mkdirSync(doctorUploadDir, { recursive: true });
-}
-
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, prescriptionUploadDir);
-  },
-  filename: (req, file, cb) => {
-    const ext = path.extname(file.originalname).toLowerCase();
-    const randomHex = crypto.randomBytes(16).toString('hex');
-    cb(null, `rx_${Date.now()}_${randomHex}${ext}`);
-  },
-});
-
-const doctorStorage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, doctorUploadDir);
-  },
-  filename: (req, file, cb) => {
-    const ext = path.extname(file.originalname).toLowerCase();
-    const randomHex = crypto.randomBytes(8).toString('hex');
-    cb(null, `doc_${Date.now()}_${randomHex}${ext}`);
-  },
-});
-
-const allowedMimes = [
+export const PRESCRIPTION_ALLOWED_MIMES = [
   'image/jpeg',
   'image/jpg',
   'image/png',
@@ -49,32 +12,53 @@ const allowedMimes = [
   'application/pdf',
 ];
 
-const photoAllowedMimes = [
+export const PRESCRIPTION_ALLOWED_EXTENSIONS = [
+  '.jpg',
+  '.jpeg',
+  '.png',
+  '.webp',
+  '.gif',
+  '.pdf',
+];
+
+export const DOCTOR_PHOTO_ALLOWED_MIMES = [
   'image/jpeg',
   'image/jpg',
   'image/png',
   'image/webp',
 ];
 
-const allowedExtensions = ['.jpg', '.jpeg', '.png', '.webp', '.gif', '.pdf'];
-const photoAllowedExtensions = ['.jpg', '.jpeg', '.png', '.webp'];
+export const DOCTOR_PHOTO_ALLOWED_EXTENSIONS = [
+  '.jpg',
+  '.jpeg',
+  '.png',
+  '.webp',
+];
 
-const fileFilter = (req, file, cb) => {
-  const ext = path.extname(file.originalname).toLowerCase();
-  const mime = file.mimetype.toLowerCase();
+// Use memoryStorage so storage.service.js can validate magic bytes and stream directly
+// to Cloudinary (doctor photos), Cloudflare R2 (private prescriptions), or local dev disk.
+const memoryStorage = multer.memoryStorage();
 
-  if (allowedMimes.includes(mime) && allowedExtensions.includes(ext)) {
+const prescriptionFileFilter = (req, file, cb) => {
+  const ext = path.extname(file.originalname || '').toLowerCase();
+  const mime = (file.mimetype || '').toLowerCase();
+
+  if (PRESCRIPTION_ALLOWED_MIMES.includes(mime) && PRESCRIPTION_ALLOWED_EXTENSIONS.includes(ext)) {
     cb(null, true);
   } else {
-    cb(new Error('Invalid file type or extension. Only JPEG, PNG, WEBP, GIF images or PDF documents are permitted.'));
+    cb(
+      new Error(
+        'Invalid file type or extension. Only JPEG, PNG, WEBP, GIF images or PDF documents are permitted.'
+      )
+    );
   }
 };
 
-const photoFilter = (req, file, cb) => {
-  const ext = path.extname(file.originalname).toLowerCase();
-  const mime = file.mimetype.toLowerCase();
+const doctorPhotoFilter = (req, file, cb) => {
+  const ext = path.extname(file.originalname || '').toLowerCase();
+  const mime = (file.mimetype || '').toLowerCase();
 
-  if (photoAllowedMimes.includes(mime) && photoAllowedExtensions.includes(ext)) {
+  if (DOCTOR_PHOTO_ALLOWED_MIMES.includes(mime) && DOCTOR_PHOTO_ALLOWED_EXTENSIONS.includes(ext)) {
     cb(null, true);
   } else {
     cb(new Error('Invalid photo format. Only JPG, JPEG, PNG, or WEBP images are permitted.'));
@@ -82,19 +66,19 @@ const photoFilter = (req, file, cb) => {
 };
 
 export const prescriptionUpload = multer({
-  storage,
-  fileFilter,
+  storage: memoryStorage,
+  fileFilter: prescriptionFileFilter,
   limits: {
-    fileSize: 5 * 1024 * 1024, // 5 Megabytes
+    fileSize: MAX_UPLOAD_SIZE_BYTES,
     files: 1,
   },
 });
 
 export const doctorPhotoUpload = multer({
-  storage: doctorStorage,
-  fileFilter: photoFilter,
+  storage: memoryStorage,
+  fileFilter: doctorPhotoFilter,
   limits: {
-    fileSize: 5 * 1024 * 1024, // 5 Megabytes
+    fileSize: MAX_UPLOAD_SIZE_BYTES,
     files: 1,
   },
 });

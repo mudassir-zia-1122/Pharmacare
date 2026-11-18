@@ -1,6 +1,7 @@
 import { query } from '../config/db.js';
 import { ApiError } from '../utils/ApiError.js';
 import emailService from './email.service.js';
+import storageService from './storage.service.js';
 import { logAudit } from './audit.service.js';
 
 /**
@@ -45,10 +46,18 @@ export async function createInquiry(data, file) {
     }
   }
 
-  const imageFilename = file ? file.filename : null;
-  const imageOriginalName = file ? file.originalname : null;
-  const imageMimeType = file ? file.mimetype : null;
-  const imageSizeBytes = file ? file.size : null;
+  let imageFilename = null;
+  let imageOriginalName = null;
+  let imageMimeType = null;
+  let imageSizeBytes = null;
+
+  if (file) {
+    const uploaded = await storageService.uploadPrivatePrescription(file);
+    imageFilename = uploaded.storageKey;
+    imageOriginalName = uploaded.originalName;
+    imageMimeType = uploaded.mimeType;
+    imageSizeBytes = uploaded.size;
+  }
 
   const result = await query(
     `INSERT INTO doctor_inquiries

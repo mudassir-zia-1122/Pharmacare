@@ -1,15 +1,10 @@
 import path from 'path';
-import fs from 'fs';
-import { fileURLToPath } from 'url';
 import inquiryService from '../services/inquiry.service.js';
 import emailService from '../services/email.service.js';
+import storageService from '../services/storage.service.js';
 import { ApiResponse } from '../utils/ApiResponse.js';
 import { ApiError } from '../utils/ApiError.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const PRESCRIPTION_UPLOAD_DIR = path.resolve(__dirname, '../../uploads/prescriptions');
 
 export const submitInquiry = asyncHandler(async (req, res) => {
   const result = await inquiryService.createInquiry(req.body, req.file);
@@ -33,19 +28,31 @@ export const streamInquiryImage = asyncHandler(async (req, res) => {
     throw ApiError.notFound('No prescription image attached to this inquiry');
   }
 
-  const safeFilename = path.basename(inquiry.imageFilename);
-  const filePath = path.resolve(PRESCRIPTION_UPLOAD_DIR, safeFilename);
-
-  // Strict directory containment check
-  if (!filePath.startsWith(PRESCRIPTION_UPLOAD_DIR + path.sep) || !fs.existsSync(filePath)) {
-    throw ApiError.notFound('Prescription file does not exist on disk');
+  // Optional short-lived signed URL mode for R2-backed private prescriptions
+  if (req.query.format === 'signed-url' && inquiry.imageFilename.startsWith('r2://')) {
+    const signed = await storageService.getPrivatePrescriptionSignedUrl(inquiry.imageFilename);
+    return ApiResponse.success(res, signed, 'Short-lived signed prescription URL generated');
   }
 
+  const fileAsset = await storageService.getPrivatePrescriptionStream(inquiry.imageFilename);
   const safeOriginalName = path.basename(inquiry.imageOriginalName || 'prescription').replace(/["\r\n]/g, '');
-  res.setHeader('Content-Type', inquiry.imageMimeType || 'image/jpeg');
+
+  res.setHeader('Content-Type', inquiry.imageMimeType || fileAsset.contentType || 'application/octet-stream');
+  if (fileAsset.contentLength) {
+    res.setHeader('Content-Length', String(fileAsset.contentLength));
+  }
   res.setHeader('Content-Disposition', `inline; filename="${safeOriginalName}"`);
   res.setHeader('Cache-Control', 'private, no-store');
-  return res.sendFile(filePath);
+
+  fileAsset.stream.on('error', (err) => {
+    if (!res.headersSent) {
+      res.status(502).json({ success: false, message: 'Failed to stream private prescription file.' });
+    } else {
+      res.destroy(err);
+    }
+  });
+
+  return fileAsset.stream.pipe(res);
 });
 
 export const saveItems = asyncHandler(async (req, res) => {

@@ -1,4 +1,5 @@
 import * as doctorService from '../services/doctor.service.js';
+import storageService from '../services/storage.service.js';
 
 export async function getDoctors(req, res, next) {
   try {
@@ -56,11 +57,14 @@ export async function uploadDoctorPhoto(req, res, next) {
     if (!req.file) {
       return res.status(400).json({ success: false, message: 'No photo file provided.' });
     }
-    const photoUrl = `/uploads/doctors/${req.file.filename}`;
-    const result = await doctorService.updateDoctorPhoto(req.params.id, photoUrl, req.user?.id);
+    const uploaded = await storageService.uploadDoctorPhoto(req.file);
+    const result = await doctorService.updateDoctorPhoto(req.params.id, uploaded.url, req.user?.id);
     res.json({
       success: true,
-      data: result,
+      data: {
+        ...result,
+        storageProvider: uploaded.provider,
+      },
       message: 'Doctor photograph uploaded successfully.',
     });
   } catch (err) {

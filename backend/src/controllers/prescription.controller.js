@@ -1,14 +1,9 @@
 import path from 'path';
-import fs from 'fs';
-import { fileURLToPath } from 'url';
 import prescriptionService from '../services/prescription.service.js';
+import storageService from '../services/storage.service.js';
 import { ApiResponse } from '../utils/ApiResponse.js';
 import { ApiError } from '../utils/ApiError.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const PRESCRIPTION_UPLOAD_DIR = path.resolve(__dirname, '../../uploads/prescriptions');
 
 export const listPrescriptions = asyncHandler(async (req, res) => {
   const { status, search, page, limit } = req.query;
@@ -33,20 +28,38 @@ export const verifyPrescription = asyncHandler(async (req, res) => {
 });
 
 export const streamPrescriptionFile = asyncHandler(async (req, res) => {
-  const requested = req.params.filename || '';
-  const safeFilename = path.basename(requested);
-  if (!safeFilename || safeFilename !== requested) {
-    throw ApiError.badRequest('Invalid prescription filename');
+  const storageKey = req.query.key || req.params.filename || '';
+  if (!storageKey) {
+    throw ApiError.badRequest('Prescription file identifier is required');
   }
 
-  const filePath = path.resolve(PRESCRIPTION_UPLOAD_DIR, safeFilename);
-  if (!filePath.startsWith(PRESCRIPTION_UPLOAD_DIR + path.sep) || !fs.existsSync(filePath)) {
-    throw ApiError.notFound('Prescription file not found');
-  }
+  const fileAsset = await storageService.getPrivatePrescriptionStream(storageKey);
+  const displayName = path.basename(storageKey.replace(/^r2:\/\//, '')).replace(/["\r\n]/g, '');
 
+  if (fileAsset.contentType) {
+    res.setHeader('Content-Type', fileAsset.contentType);
+  }
+  if (fileAsset.contentLength) {
+    res.setHeader('Content-Length', String(fileAsset.contentLength));
+  }
   res.setHeader('Cache-Control', 'private, no-store');
-  res.setHeader('Content-Disposition', `inline; filename="${safeFilename.replace(/["\r\n]/g, '')}"`);
-  return res.sendFile(filePath);
+  res.setHeader('Content-Disposition', `inline; filename="${displayName || 'prescription'}"`);
+
+  fileAsset.stream.on('error', (err) => {
+    if (!res.headersSent) {
+      res.status(502).json({ success: false, message: 'Failed to stream private prescription file.' });
+    } else {
+      res.destroy(err);
+    }
+  });
+
+  return fileAsset.stream.pipe(res);
+});
+
+export const getPrescriptionSignedUrl = asyncHandler(async (req, res) => {
+  const storageKey = req.query.key || '';
+  const signed = await storageService.getPrivatePrescriptionSignedUrl(storageKey);
+  return ApiResponse.success(res, signed, 'Short-lived signed prescription URL generated');
 });
 
 export default {
@@ -55,4 +68,5 @@ export default {
   createPrescription,
   verifyPrescription,
   streamPrescriptionFile,
+  getPrescriptionSignedUrl,
 };
