@@ -2,8 +2,23 @@ import mysql from 'mysql2/promise';
 import dotenv from 'dotenv';
 import fs from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
 
-dotenv.config();
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Ensure .env is discovered regardless of launch directory
+const envCandidates = [
+  path.resolve(process.cwd(), '.env'),
+  path.resolve(process.cwd(), 'backend/.env'),
+  path.resolve(__dirname, '../../.env'),
+];
+for (const envFile of envCandidates) {
+  if (fs.existsSync(envFile)) {
+    dotenv.config({ path: envFile });
+    break;
+  }
+}
 
 /**
  * Builds the TLS/SSL configuration object in an environment-driven manner.
@@ -24,14 +39,20 @@ function buildSslConfig() {
   };
 
   if (caPath) {
-    const resolvedPath = path.isAbsolute(caPath)
-      ? caPath
-      : path.resolve(process.cwd(), caPath);
+    const candidatePaths = [
+      caPath,
+      path.resolve(process.cwd(), caPath),
+      path.resolve(process.cwd(), 'backend', caPath),
+      path.resolve(__dirname, '../../', caPath),
+      path.resolve(__dirname, '../certs/isrgrootx1.pem'),
+    ];
 
-    if (fs.existsSync(resolvedPath)) {
+    let resolvedPath = candidatePaths.find(p => p && fs.existsSync(p));
+
+    if (resolvedPath && fs.existsSync(resolvedPath)) {
       sslOptions.ca = fs.readFileSync(resolvedPath);
     } else {
-      console.warn(`[DATABASE WARNING] Configured DB_CA_PATH file not found at: ${resolvedPath}. Falling back to default trust store.`);
+      console.warn(`[DATABASE WARNING] Configured DB_CA_PATH file not found at: ${caPath}. Falling back to default trust store.`);
     }
   }
 

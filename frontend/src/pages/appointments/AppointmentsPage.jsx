@@ -151,7 +151,7 @@ export function AppointmentsPage() {
     try {
       const res = await appointmentApi.fetchAvailableSlots(docId, dateStr);
       if (res && res.data) {
-        setRescheduleSlots(res.data.slots?.filter((s) => s.available) || []);
+        setRescheduleSlots(res.data.slots?.filter((s) => s.isAvailable ?? s.available) || []);
       }
     } catch (err) {
       console.error('Error fetching slots:', err);

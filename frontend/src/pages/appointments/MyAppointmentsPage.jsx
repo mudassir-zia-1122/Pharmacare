@@ -79,7 +79,7 @@ export function MyAppointmentsPage() {
     try {
       const res = await appointmentApi.fetchAvailableSlots(docId, dateStr);
       if (res && res.data) {
-        setAvailableSlots(res.data.slots?.filter((s) => s.available) || []);
+        setAvailableSlots(res.data.slots?.filter((s) => s.isAvailable ?? s.available) || []);
       }
     } catch (err) {
       console.error('Error fetching reschedule slots:', err);

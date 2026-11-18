@@ -144,7 +144,8 @@ export function BookAppointmentPage() {
 
   // Handle slot selection
   const handleSelectSlot = (slot) => {
-    if (!slot.available) return;
+    const isAvail = slot.isAvailable ?? slot.available ?? false;
+    if (!isAvail) return;
     setSelectedSlot(slot);
   };
 
@@ -170,12 +171,14 @@ export function BookAppointmentPage() {
         patientName: patientData.patientName.trim(),
         patientPhone: patientData.patientPhone.trim(),
         patientEmail: patientData.patientEmail.trim() || undefined,
+        patientAge: patientData.age ? parseInt(patientData.age, 10) : undefined,
         age: patientData.age ? parseInt(patientData.age, 10) : undefined,
+        patientGender: patientData.gender,
         gender: patientData.gender,
         bloodGroup: patientData.bloodGroup || undefined,
         reasonForVisit: patientData.reasonForVisit.trim() || undefined,
         notes: patientData.notes.trim() || undefined,
-        appointmentType: 'consultation',
+        appointmentType: 'online',
       };
 
       const res = await appointmentApi.bookAppointment(payload);
@@ -549,31 +552,32 @@ export function BookAppointmentPage() {
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 pt-2">
                   {availableSlots.map((slot, idx) => {
                     const isSelected = selectedSlot?.time === slot.time;
+                    const isAvail = slot.isAvailable ?? slot.available ?? false;
                     return (
                       <button
                         key={idx}
                         type="button"
-                        disabled={!slot.available}
+                        disabled={!isAvail}
                         onClick={() => handleSelectSlot(slot)}
                         className={`p-3 rounded-xl border text-center transition-all flex flex-col items-center justify-center ${
-                          !slot.available
+                          !isAvail
                             ? 'bg-slate-100 dark:bg-slate-800/40 border-slate-200 dark:border-slate-800 text-slate-400 cursor-not-allowed opacity-60'
                             : isSelected
                             ? 'bg-teal-600 text-white border-teal-600 shadow-md ring-2 ring-teal-300 dark:ring-teal-900 font-bold'
                             : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:border-teal-500 hover:bg-teal-50/30'
                         }`}
                       >
-                        <span className="text-sm font-semibold">{slot.time}</span>
+                        <span className="text-sm font-semibold">{slot.displayTime || slot.time}</span>
                         <span
                           className={`text-[10px] mt-0.5 ${
                             isSelected
                               ? 'text-teal-100'
-                              : !slot.available
+                              : !isAvail
                               ? 'text-rose-500 font-medium'
                               : 'text-teal-600 dark:text-teal-400 font-medium'
                           }`}
                         >
-                          {slot.available ? 'Available' : 'Booked'}
+                          {isAvail ? 'Available' : 'Booked'}
                         </span>
                       </button>
                     );

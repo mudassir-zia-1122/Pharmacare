@@ -224,6 +224,7 @@ export async function getAvailableSlots(doctorId, dateStr) {
     return {
       ...slot,
       isAvailable: !isBooked,
+      available: !isBooked,
     };
   });
 
@@ -252,7 +253,9 @@ export async function bookAppointment(bookingData, userId = null) {
     patientPhone,
     patientEmail,
     patientAge,
-    patientGender = 'male',
+    age,
+    patientGender,
+    gender,
     patientId = null,
     reasonForVisit = null,
     notes = null,
@@ -268,6 +271,14 @@ export async function bookAppointment(bookingData, userId = null) {
   const cleanName = patientName.trim();
   const cleanPhone = patientPhone.trim();
   const cleanTime = parseTimeTo24h(appointmentTime);
+  const cleanAge = patientAge ? parseInt(patientAge, 10) : (age ? parseInt(age, 10) : null);
+  const cleanGender = patientGender || gender || 'male';
+
+  const validTypes = [APPOINTMENT_TYPE.ONLINE, APPOINTMENT_TYPE.WALK_IN, APPOINTMENT_TYPE.EMERGENCY];
+  const cleanType = validTypes.includes(appointmentType) ? appointmentType : APPOINTMENT_TYPE.ONLINE;
+
+  const validPriorities = [PRIORITY_LEVEL.NORMAL, PRIORITY_LEVEL.EMERGENCY];
+  const cleanPriority = validPriorities.includes(priorityLevel) ? priorityLevel : PRIORITY_LEVEL.NORMAL;
 
   return withTransaction(async (conn) => {
     // 1. Verify doctor exists and lock row
@@ -355,7 +366,7 @@ export async function bookAppointment(bookingData, userId = null) {
     const consultationFee = parseFloat(doc.consultation_fee || 1500.00);
 
     // Initial appointment status
-    const initialStatus = appointmentType === APPOINTMENT_TYPE.WALK_IN
+    const initialStatus = cleanType === APPOINTMENT_TYPE.WALK_IN
       ? APPOINTMENT_STATUS.CHECKED_IN
       : APPOINTMENT_STATUS.BOOKED;
 
@@ -374,15 +385,15 @@ export async function bookAppointment(bookingData, userId = null) {
         cleanName,
         cleanPhone,
         patientEmail ? patientEmail.trim() : null,
-        patientAge ? parseInt(patientAge, 10) : null,
-        patientGender || 'male',
+        cleanAge,
+        cleanGender,
         doctorId,
         deptId,
         appointmentDate,
         cleanTime,
         slotEndTime,
-        appointmentType,
-        priorityLevel,
+        cleanType,
+        cleanPriority,
         initialStatus,
         consultationFee,
         reasonForVisit ? reasonForVisit.trim() : null,
